@@ -8,7 +8,23 @@ When memories are provided, use them naturally to personalize your responses. Do
 
 Be warm, helpful, and concise. If the user shares something new about themselves, acknowledge it naturally.`
 
+const ALLOWED_ORIGINS = new Set([
+  'https://mem0-memory-agent.vercel.app',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+])
+
+function originAllowed(req: NextRequest): boolean {
+  const origin = req.headers.get('origin')
+  // Same-origin server calls may omit Origin; only block cross-site origins.
+  return !origin || ALLOWED_ORIGINS.has(origin)
+}
+
 export async function POST(req: NextRequest) {
+  if (!originAllowed(req)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
   const mem0 = new MemoryClient({ apiKey: process.env.MEM0_API_KEY! })
 
@@ -66,8 +82,8 @@ export async function POST(req: NextRequest) {
           // non-fatal
         }
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err)
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: msg })}\n\n`))
+        console.error('chat route error:', err)
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: 'Something went wrong. Please try again.' })}\n\n`))
         controller.close()
       }
     }
